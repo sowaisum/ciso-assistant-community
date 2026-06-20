@@ -4,6 +4,10 @@ This deployment runs the CISO Assistant SvelteKit frontend on Vercel. The Django
 API, PostgreSQL database, Huey worker, and optional Qdrant service must run on a
 separate container-capable host.
 
+This branch includes a root-level `render.yaml` Blueprint for the Django API,
+Huey worker, and managed PostgreSQL database. Create the Render Blueprint first,
+then use its public API URL in the Vercel variables below.
+
 ## Vercel project settings
 
 - Framework preset: `SvelteKit`
@@ -40,3 +44,8 @@ Use PostgreSQL and S3-compatible or Azure Blob storage for production. Run the
 Huey worker as a separate long-lived process. The backend URL must allow HTTPS
 requests from the Vercel frontend and must use the same public application URL
 for authentication and SSO callbacks.
+
+The provided Render Blueprint prompts for the public Vercel URL and initial
+administrator credentials. Attach S3-compatible or Azure Blob storage before
+using evidence uploads in production; Render service filesystems are ephemeral
+unless a persistent disk is attached.

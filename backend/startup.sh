@@ -3,6 +3,15 @@
 if [ ! -n "$DJANGO_SETTINGS_MODULE" ]; then
   export DJANGO_SETTINGS_MODULE=ciso_assistant.settings
 fi
+
+if [ "$PROCESS_ROLE" = "worker" ]; then
+  until python manage.py migrate --check --settings="${DJANGO_SETTINGS_MODULE}" >/dev/null 2>&1; do
+    echo "database migrations not ready; waiting"
+    sleep 15
+  done
+  exec python manage.py run_huey -w "${HUEY_WORKERS:-2}" -k process
+fi
+
 if [ ! -n "$DJANGO_SECRET_KEY" ]; then
   if [ ! -f db/django_secret_key ]; then
     openssl rand -hex 32 | install -m 600 /dev/stdin db/django_secret_key
