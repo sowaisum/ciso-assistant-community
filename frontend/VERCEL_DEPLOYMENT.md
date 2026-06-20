@@ -16,6 +16,9 @@ then use its public API URL in the Vercel variables below.
 - Build command: `pnpm run build`
 - Production branch: `codex/vercel-deployment-v3.18.2`
 
+The checked-in `vercel.json` pins the install and build commands so the required
+Paraglide translation compilation runs before Vite builds the application.
+
 ## Required environment variables
 
 Set these variables for Production, Preview, and Development in Vercel:
