@@ -38,6 +38,9 @@ You can preview the production build with `pnpm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
 
+For a Vercel frontend deployment backed by an externally hosted Django API, see
+[VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md).
+
 ## Testing with Safari
 
 Safari requires https. To test it, the simplest solution is to use a local instance of caddy. To have it work properly, it is necessary to trick vite by sending it the Origin variable, as vite does not handle environment variables. The Caddyfile provided here is working properly, and can be launched by simply typing "caddy run".
