@@ -1,0 +1,81 @@
+name: Deploy Oracle backend
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oracle-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      OCI_HOST: ${{ secrets.OCI_HOST }}
+      OCI_USER: ${{ secrets.OCI_USER }}
+      OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+      OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
+      OCI_DEPLOY_ENV: ${{ secrets.OCI_DEPLOY_ENV }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in OCI_HOST OCI_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_DEPLOY_ENV; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing required secret: ${name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "${OCI_SSH_PRIVATE_KEY}" > ~/.ssh/oracle
+          chmod 0600 ~/.ssh/oracle
+          printf '%s\n' "${OCI_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          chmod 0600 ~/.ssh/known_hosts
+
+      - name: Upload deployment files
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${OCI_DEPLOY_ENV}" > /tmp/ciso-assistant.env
+          chmod 0600 /tmp/ciso-assistant.env
+          ssh -i ~/.ssh/oracle "${OCI_USER}@${OCI_HOST}" "mkdir -p /opt/ciso-assistant"
+          scp -i ~/.ssh/oracle deploy/oracle/Caddyfile deploy/oracle/docker-compose.yml \
+            "${OCI_USER}@${OCI_HOST}:/opt/ciso-assistant/"
+          scp -i ~/.ssh/oracle /tmp/ciso-assistant.env \
+            "${OCI_USER}@${OCI_HOST}:/opt/ciso-assistant/.env"
+
+      - name: Deploy services
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/oracle "${OCI_USER}@${OCI_HOST}" <<'REMOTE'
+            set -euo pipefail
+            cd /opt/ciso-assistant
+            chmod 0600 .env
+            docker compose config --quiet
+            docker compose pull
+            docker compose up -d --remove-orphans
+            API_DOMAIN="$(sed -n 's/^API_DOMAIN=//p' .env | tail -1)"
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --show-error "https://${API_DOMAIN}/api/health/" >/dev/null; then
+                docker compose ps
+                exit 0
+              fi
+              sleep 10
+            done
+            docker compose logs --tail=200 backend caddy
+            exit 1
+          REMOTE

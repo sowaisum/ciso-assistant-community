@@ -1,12 +1,8 @@
 # Vercel frontend deployment
 
-This deployment runs the CISO Assistant SvelteKit frontend on Vercel. The Django
-API, PostgreSQL database, Huey worker, and optional Qdrant service must run on a
-separate container-capable host.
-
-This branch includes a root-level `render.yaml` Blueprint for the Django API,
-Huey worker, and managed PostgreSQL database. Create the Render Blueprint first,
-then use its public API URL in the Vercel variables below.
+The SvelteKit frontend runs on Vercel. The Django API, PostgreSQL database, Huey
+worker, Qdrant, and evidence volume run on an Oracle Cloud Always Free Ampere A1
+VM using the files in `deploy/oracle`.
 
 ## Vercel project settings
 
@@ -21,34 +17,24 @@ Paraglide translation compilation runs before Vite builds the application.
 
 ## Required environment variables
 
-Set these variables for Production, Preview, and Development in Vercel:
+After the Oracle VM is running, set these values for Vercel Production:
 
 ```text
-PUBLIC_BACKEND_API_URL=https://api.example.com/api
-PUBLIC_BACKEND_API_EXPOSED_URL=https://api.example.com/api
+PUBLIC_BACKEND_API_URL=https://203-0-113-10.sslip.io/api
+PUBLIC_BACKEND_API_EXPOSED_URL=https://203-0-113-10.sslip.io/api
 NODE_OPTIONS=--max-old-space-size=8192
 ```
 
-Both URLs must use HTTPS and point to the public Django API. Do not deploy with
-the default `http://localhost:8000/api` value.
+Replace the example address with the sslip.io hostname derived from the Oracle
+VM public IP. Both URLs must use HTTPS.
 
-## Backend requirements
-
-Configure the backend host with at least:
+The Oracle backend must set:
 
 ```text
-CISO_ASSISTANT_URL=https://your-project.vercel.app
+CISO_ASSISTANT_URL=https://ciso-assistant-sowaisum.vercel.app
 DJANGO_DEBUG=False
-DJANGO_SECRET_KEY=<persistent-random-secret>
-ALLOWED_HOSTS=api.example.com
+ALLOWED_HOSTS=203-0-113-10.sslip.io,backend,localhost
 ```
 
-Use PostgreSQL and S3-compatible or Azure Blob storage for production. Run the
-Huey worker as a separate long-lived process. The backend URL must allow HTTPS
-requests from the Vercel frontend and must use the same public application URL
-for authentication and SSO callbacks.
-
-The provided Render Blueprint prompts for the public Vercel URL and initial
-administrator credentials. Attach S3-compatible or Azure Blob storage before
-using evidence uploads in production; Render service filesystems are ephemeral
-unless a persistent disk is attached.
+See `deploy/oracle/README.md` for VM provisioning, GitHub secrets, deployment,
+and backup guidance.

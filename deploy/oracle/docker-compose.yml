@@ -1,0 +1,126 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_NAME}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  backend:
+    image: ghcr.io/intuitem/ciso-assistant-community/backend:v3.18.2
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: &backend_environment
+      CISO_ASSISTANT_URL: ${CISO_ASSISTANT_URL}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD}
+      POSTGRES_NAME: ${POSTGRES_NAME}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      AUTH_TOKEN_TTL: ${AUTH_TOKEN_TTL:-3600}
+      AUTH_TOKEN_AUTO_REFRESH: ${AUTH_TOKEN_AUTO_REFRESH:-True}
+      AUTH_TOKEN_AUTO_REFRESH_TTL: ${AUTH_TOKEN_AUTO_REFRESH_TTL:-36000}
+      ENABLE_SANDBOX: "True"
+      QDRANT_URL: http://qdrant:6333
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev
+    volumes:
+      - attachments_data:/code/db/attachments
+    networks:
+      - internal
+      - edge
+
+  huey:
+    image: ghcr.io/intuitem/ciso-assistant-community/backend:v3.18.2
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      <<: *backend_environment
+      HUEY_WORKERS: ${HUEY_WORKERS:-2}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - exec python manage.py run_huey -w "${HUEY_WORKERS:-2}" -k process
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev
+    volumes:
+      - attachments_data:/code/db/attachments
+    networks:
+      - internal
+
+  qdrant:
+    image: qdrant/qdrant:v1.14.0
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2.11.2-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - edge
+
+networks:
+  internal:
+    internal: true
+  edge:
+
+volumes:
+  postgres_data:
+  attachments_data:
+  qdrant_data:
+  caddy_data:
+  caddy_config:
