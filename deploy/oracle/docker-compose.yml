@@ -29,6 +29,8 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL}
       DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD}
+      CISO_ASSISTANT_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL}
+      FORCE_CREATE_ADMIN: "True"
       POSTGRES_NAME: ${POSTGRES_NAME}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -39,6 +41,12 @@ services:
       AUTH_TOKEN_AUTO_REFRESH_TTL: ${AUTH_TOKEN_AUTO_REFRESH_TTL:-36000}
       ENABLE_SANDBOX: "True"
       QDRANT_URL: http://qdrant:6333
+      HUEY_FILE_PATH: /code/db/huey.db
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/.cache
+      XDG_CONFIG_HOME: /tmp/.config
+      XDG_DATA_HOME: /tmp/.local/share
+      UV_CACHE_DIR: /tmp/uv-cache
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: ${LOG_FORMAT:-json}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
@@ -56,7 +64,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev
     volumes:
-      - attachments_data:/code/db/attachments
+      - app_data:/code/db
     networks:
       - internal
       - edge
@@ -82,7 +90,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev
     volumes:
-      - attachments_data:/code/db/attachments
+      - app_data:/code/db
     networks:
       - internal
 
@@ -120,7 +128,7 @@ networks:
 
 volumes:
   postgres_data:
-  attachments_data:
+  app_data:
   qdrant_data:
   caddy_data:
   caddy_config:
